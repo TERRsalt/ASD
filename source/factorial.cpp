@@ -1,12 +1,15 @@
 #include <print>
 
-int factorial(const int n) {
+long long factorial(const int n, int &numberOfOperations) {
     if (n < 0) {
         std::println("Silnia z liczby nie może być ujemna!");
         return -1;
     }
 
-    int returnNumber = 1;
-    for (int i = 1; i <= n; i++) returnNumber *= i;
+    long long returnNumber = 1;
+    for (int i = 2; i <= n; i++) {
+        returnNumber *= i;
+        numberOfOperations++;
+    }
     return returnNumber;
 }

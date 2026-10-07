@@ -1,3 +1,5 @@
 #pragma once
 
-void bajtdocjaSafe(int n, int m, const std::vector<int> &coordinates);
+#include <vector>
+
+void problem4(const std::string &inputPath, const std::string &outputPath);

@@ -1,3 +1,3 @@
 #pragma once
 
-int factorial(int n);
+long long factorial(int n, int &numberOfOperations);

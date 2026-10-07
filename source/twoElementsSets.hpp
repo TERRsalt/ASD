@@ -1,5 +1,5 @@
 #pragma once
 
-#include <vector>
+#include <string>
 
-void twoElementsSets(int n, int k, std::vector<int> numbers);
+void problem2(const std::string &inputPath, const std::string &outputPath);

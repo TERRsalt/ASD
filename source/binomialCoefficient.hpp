@@ -1,4 +1,5 @@
 #pragma once
 
-int binomialCoefficient(int n, int k);
-int binomialCoefficientRecurrence(int n, int k);
+#include <string>
+
+void problem1(const std::string &inputPath, const std::string &outputPath);
