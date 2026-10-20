@@ -2,6 +2,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 #include <print>
 #include <sstream>
 
@@ -54,7 +55,8 @@ void problem2(const std::string &inputPath, const std::string &outputPath) {
                     else i++;
                 }
 
+    std::filesystem::create_directories("output");
     std::ofstream output(outputPath);
-    output << h << ' ' << o << ' ' << i << '\n';
+    std::println(output, "{} {} {}", h, o, i);
     output.close();
 }
