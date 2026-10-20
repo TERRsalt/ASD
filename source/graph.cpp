@@ -1,7 +1,10 @@
 #include <print>
 #include <vector>
 
+//todo // Zmienić to, żeby działało przeszukaniem w głąb //
 static int graph(const int n, const std::vector<std::vector<int>> &adjacencyList, std::vector<int> &steps) {
+    if (adjacencyList.empty()) return -1;
+
     static std::vector checkedElements(n, false);
     static int searchedElement = 1;
 
@@ -11,23 +14,10 @@ static int graph(const int n, const std::vector<std::vector<int>> &adjacencyList
     std::vector<int> notCheckedElements;
     for (int element: adjacencyList[searchedElement - 1]) if (!checkedElements[element - 1]) notCheckedElements.push_back(element);
     if (notCheckedElements.empty()) {
-        // int notCheckedElementIndex = 0; //todo // Popraw to, żeby działało na wszystkich (zmień to żeby szukało każdego `false`-a) //
-        // for (const int checkedElement: checkedElements) {
-        //     notCheckedElementIndex++;
-        //     if (!checkedElement) {
-        //         if (adjacencyList[notCheckedElementIndex - 1][0]) steps.push_back(notCheckedElementIndex);
-        //         return notCheckedElementIndex - 1;
-        //     }
-        // }
-
-        int notCheckedElementIndex = 0;
-        for (const int checkedElement: checkedElements) {
-            notCheckedElementIndex++;
-            if (!checkedElement) {
-                if (adjacencyList[notCheckedElementIndex - 1][0]) steps.push_back(notCheckedElementIndex);
-                return notCheckedElementIndex - 1;
-            }
-        }
+        for (int i = 0; i < checkedElements.size(); i++)
+            if (!adjacencyList[i].empty() && !checkedElements[i] && checkedElements[adjacencyList[i][0] - 1])
+                steps.push_back(i + 1);
+        return -1;
     }
     searchedElement = *std::min_element(notCheckedElements.begin(), notCheckedElements.end());
 
@@ -56,17 +46,13 @@ static std::vector<std::vector<int>> adjListFalse = {
     {2, 4, 6}
 };
 
-//todo // Zrób, żeby działało dla tych danych //
-
 static std::vector<std::vector<int>> adjListAi1 = {
     {2, 3, 4},
     {1},
-    {1},
+    {},
     {1}
 };
-static std::vector<std::vector<int>> adjListAi2 = {{2}, {1}};
-static std::vector<std::vector<int>> adjListAi3 = {};
-
+static std::vector<std::vector<int>> adjListAi2 = {{2}, {1}, {4}, {3}};
 std::vector<int> stepsss;
 
 void problem6() {
