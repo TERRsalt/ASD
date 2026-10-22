@@ -5,7 +5,7 @@
 
 int main() {
     problem2("input/In0202.txt", "output/Out0202.txt");
-    problem6();
+    problem6("input/In0206.txt", "output/Out0206.txt");
 
     return 0;
 }

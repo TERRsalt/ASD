@@ -1,3 +1,3 @@
 #pragma once
 
-void problem6();
+void problem6(const std::string &inputPath, const std::string &outputPath);
