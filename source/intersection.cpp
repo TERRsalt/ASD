@@ -6,7 +6,7 @@
 #include <fstream>
 #include <sstream>
 
-static bool intersection(const std::vector<int> &set, int beginningOfTheSet, int endOfTheSet, const int searchedNumber) {
+static bool binarySearch(const std::vector<int> &set, int beginningOfTheSet, int endOfTheSet, const int searchedNumber) {
     const int n = endOfTheSet - beginningOfTheSet + 1;
 
     if (n <= 0) return false;
@@ -16,7 +16,18 @@ static bool intersection(const std::vector<int> &set, int beginningOfTheSet, int
     if (searchedNumber < set[middleOfTheSet]) endOfTheSet = middleOfTheSet - 1;
     else beginningOfTheSet = middleOfTheSet;
 
-    return intersection(set, beginningOfTheSet, endOfTheSet, searchedNumber);
+    return binarySearch(set, beginningOfTheSet, endOfTheSet, searchedNumber);
+}
+
+static void intersection(const int n, const std::vector<int> &set1, const std::vector<int> &set2, std::vector<int> &intersectedNumbers) {
+    for (const int searchedNumber: set1) {
+        if (binarySearch(set2, 0, n - 1, searchedNumber)) intersectedNumbers.push_back(searchedNumber);
+    }
+
+    std::ranges::sort(intersectedNumbers); //exp // `ranges::sort` ma w najgorszym przypadku złożoność czasową n*log(n) //
+    //exp // `unique` + `erase` ma złożoność czasową n //
+    const auto [firstNotUniqueNumber, lastNotUniqueNumber] = std::ranges::unique(intersectedNumbers);
+    intersectedNumbers.erase(firstNotUniqueNumber, lastNotUniqueNumber);
 }
 
 void problem8(const std::string &inputPath, const std::string &outputPath) {
@@ -48,15 +59,7 @@ void problem8(const std::string &inputPath, const std::string &outputPath) {
     input.close();
 
     std::vector<int> intersectedNumbers;
-    for (const int searchedNumber: set1) {
-        if (intersection(set2, 0, n - 1, searchedNumber)) intersectedNumbers.push_back(searchedNumber);
-    }
-
-    std::ranges::sort(intersectedNumbers); //exp // `ranges::sort` ma w najgorszym przypadku złożoność czasową n*log(n) //
-    //exp // `unique` + `erase` ma złożoność czasową n //
-    const auto [firstNotUniqueNumber, lastNotUniqueNumber] = std::ranges::unique(intersectedNumbers);
-    intersectedNumbers.erase(firstNotUniqueNumber, lastNotUniqueNumber);
-
+    intersection(n, set1, set2, intersectedNumbers);
     const auto numberOfIntersectedNumbers = intersectedNumbers.size();
 
     std::filesystem::create_directories("output");
