@@ -6,7 +6,6 @@
 #include <fstream>
 #include <print>
 #include <string>
-#include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -26,7 +25,7 @@ struct TreeNode {
 }
 
 using arrayOfCharAndUnsigned = std::vector<std::pair<char, unsigned>>;
-using arrayOfTheTreeNodesUniquePointers = std::vector<std::unique_ptr<struct TreeNode>>;
+using arrayOfTheTreeNodesUniquePointers = std::vector<std::unique_ptr<TreeNode>>;
 
 static void treeLayerGenerator(arrayOfTheTreeNodesUniquePointers &treeNodes, arrayOfTheTreeNodesUniquePointers &newTreeNodes) {
     const unsigned treeSize = treeNodes.size();
@@ -78,27 +77,35 @@ static void codesGenerator(std::unordered_map<char, std::string> &codes, const s
     if (treeRoot->rightBranch != nullptr) codesGenerator(codes, treeRoot->rightBranch, code + '1');
 }
 
-static void huffmanCompression(const std::string &string, std::string &compressedString) {
-    std::map<char, unsigned> characterMap;
-    for (char character: string) {
-        if (!characterMap.contains(character)) characterMap[character] = 1;
-        else characterMap[character] += 1;
+static void huffmanCompression(const std::string &string, std::string &compressedString,
+        arrayOfCharAndUnsigned &firstOccurrence, arrayOfCharAndUnsigned &characterOccurrence, std::unordered_map<char, std::string> &codes) {
+    for (const char character: string) {
+        bool found = false;
+
+        for (auto &[key, value]: firstOccurrence) {
+            if (key == character) {
+                value++;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) firstOccurrence.emplace_back(character, 1);
     }
 
-    arrayOfCharAndUnsigned characterOccurrence(characterMap.begin(), characterMap.end());
+    characterOccurrence.assign(firstOccurrence.begin(), firstOccurrence.end());
     std::ranges::sort(characterOccurrence, [](const auto &a, const auto &b) {
         if (a.second != b.second) return a.second < b.second;
-        return false;
+        return a.first < b.first;
     });
 
     const std::unique_ptr<TreeNode> treeRoot = treeGenerator(characterOccurrence);
 
-    std::unordered_map<char, std::string> codes;
     codesGenerator(codes, treeRoot);
 
     std::string fullStringCode;
-    for (char character: string) fullStringCode += codes[character];
-    const unsigned missingZeros = 8 - fullStringCode.size() % 8;
+    for (const char character: string) fullStringCode += codes[character];
+    const unsigned missingZeros = (8 - fullStringCode.size() % 8) % 8;
     for (unsigned i = 0; i < missingZeros; i++) fullStringCode += '0';
 
     const unsigned sizeOfTheFullCode = fullStringCode.size();
@@ -121,13 +128,50 @@ void problem8(const std::string &inputPath, const std::string &outputPath) {
 
     input.close();
 
-    huffmanCompression(string, compressedString);
+    arrayOfCharAndUnsigned firstOccurrence;
+    arrayOfCharAndUnsigned characterOccurrence;
+    std::unordered_map<char, std::string> codes;
+    huffmanCompression(string, compressedString, firstOccurrence, characterOccurrence, codes);
 
     std::filesystem::create_directories("output");
     std::ofstream output(outputPath);
 
-    std::println(output, "{}", compressedString);
+    unsigned i = 0;
+    for (const auto &[character, value]: firstOccurrence) {
+        i++;
+        if (i < firstOccurrence.size()) std::print(output, "{} {}, ", character, value);
+        else std::println(output, "{} {}", character, value);
+    }
+
+    i = 0;
+    for (const auto &[character, value]: characterOccurrence) {
+        i++;
+        if (i < characterOccurrence.size()) std::print(output, "{} {}, ", character, value);
+        else std::println(output, "{} {}", character, value);
+    }
+
+    i = 0;
+    for (const auto &[character, code]: codes) {
+        i++;
+        if (i < codes.size()) std::print(output, "{}={}, ", code, character);
+        else std::println(output, "{}={}", code, character);
+    }
+
+    std::println(output, "////////////////////////////////////////////");
+
+    i = 0;
+    for (const auto &[character, value]: firstOccurrence) {
+        i++;
+        if (i < firstOccurrence.size()) std::print(output, "{}-{} ", character, value);
+        else std::println(output, "{}-{}", character, value);
+    }
+
+    std::print(output, "{}", compressedString);
 
     output.close();
+}
+
+void huffmanDecompression() {
+    //todo // Dodaj dekompresję //
 }
 }
