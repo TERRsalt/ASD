@@ -1,66 +1,133 @@
+#include "huffman.hpp"
+
+#include <algorithm>
+#include <bit>
+#include <filesystem>
+#include <fstream>
 #include <print>
 #include <string>
 #include <map>
+#include <memory>
+#include <unordered_map>
 #include <vector>
 
-using arrayOfCharAndUnsignedInt = std::vector<std::pair<char, unsigned int>>;
-
+namespace huffman {
+namespace {
 struct TreeNode {
-    char character{};
-    unsigned int value{};
-    TreeNode *leftBranch = nullptr;
-    TreeNode *rightBranch = nullptr;
+    char character;
+    unsigned value;
+    std::unique_ptr<TreeNode> leftBranch;
+    std::unique_ptr<TreeNode> rightBranch;
 
-    TreeNode(const char character, const unsigned int value): character(character), value(value) {}
-    TreeNode(const char character, const unsigned int value, TreeNode *leftBranch, TreeNode *rightBranch):
-            character(character), value(value), leftBranch(leftBranch), rightBranch(rightBranch) {}
+    explicit TreeNode(const char character = '\0', const unsigned value = 0,
+    std::unique_ptr<TreeNode> leftBranch = nullptr, std::unique_ptr<TreeNode> rightBranch = nullptr):
+    character(character), value(value), leftBranch(std::move(leftBranch)), rightBranch(std::move(rightBranch)) {}
 };
-
-static void constructATree(const arrayOfCharAndUnsignedInt &wordOccurrence) {
-    const unsigned int wordOccurrenceSize = wordOccurrence.size();
-    const unsigned int evenWordOccurrenceSize = wordOccurrenceSize / 2;
-
-    const unsigned int numberOfBytesNeededToWriteANumber = std::bit_width(wordOccurrenceSize - 1);
-
-    std::vector<TreeNode> treeNodes;
-    treeNodes.reserve(wordOccurrenceSize);
-    for (int i = 0; i < wordOccurrenceSize; i++) treeNodes.emplace_back(wordOccurrence[i].first, wordOccurrence[i].second);
-
-    std::vector<TreeNode> newTreeNodes;
-    newTreeNodes.reserve(evenWordOccurrenceSize);
-    for (int i = 0; i < evenWordOccurrenceSize; i++)
-        newTreeNodes.emplace_back('\0', treeNodes[i * 2].value + treeNodes[i * 2 + 1].value,
-                &treeNodes[i * 2], &treeNodes[i * 2 + 1]);
-    if (wordOccurrenceSize % 2 == 0) newTreeNodes.emplace_back(treeNodes[wordOccurrenceSize - 1].character, treeNodes[wordOccurrenceSize - 1].value);
-    treeNodes = {};
-
-    //todo // Dokończ tą funkcję. Przeszedłeś przez 2 warstwy i teraz będzie to po prostu pętla. (...) //
-    //todo // (...) Sprawdź ile warstw będzie to miało i przez tyle przejdź, do zbudowania pełnego drzewa. //
 }
 
-static void huffmanCompression(const std::string &word) {
-    std::map<char, unsigned int> wordMap = {};
-    for (char character: word) {
-        if (!wordMap.contains(character)) wordMap[character] = 1;
-        else wordMap[character] += 1;
+using arrayOfCharAndUnsigned = std::vector<std::pair<char, unsigned>>;
+using arrayOfTheTreeNodesUniquePointers = std::vector<std::unique_ptr<struct TreeNode>>;
+
+static void treeLayerGenerator(arrayOfTheTreeNodesUniquePointers &treeNodes, arrayOfTheTreeNodesUniquePointers &newTreeNodes) {
+    const unsigned treeSize = treeNodes.size();
+    const unsigned evenTreeSizeDividedByTwo = treeSize / 2;
+
+    newTreeNodes.reserve(evenTreeSizeDividedByTwo + 1);
+
+    for (unsigned i = 0; i < evenTreeSizeDividedByTwo; i++)
+        newTreeNodes.push_back(std::make_unique<TreeNode>('\0', treeNodes[i * 2]->value + treeNodes[i * 2 + 1]->value,
+                std::move(treeNodes[i * 2]), std::move(treeNodes[i * 2 + 1])));
+
+    if (treeSize % 2 != 0) newTreeNodes.push_back(std::move(treeNodes[treeSize - 1]));
+
+    treeNodes.clear();
+}
+
+static std::unique_ptr<TreeNode> treeGenerator(const arrayOfCharAndUnsigned &characterOccurrence) {
+    const unsigned treeSize = characterOccurrence.size();
+
+    arrayOfTheTreeNodesUniquePointers treeNodes;
+    treeNodes.reserve(treeSize);
+    for (unsigned i = 0; i < treeSize; i++)
+        treeNodes.push_back(std::make_unique<TreeNode>(characterOccurrence[i].first, characterOccurrence[i].second));
+
+    const unsigned numberOfBytesNeededToWriteANumber = std::bit_width(treeSize - 1);
+    unsigned numberOfLayers = 0;
+
+    arrayOfTheTreeNodesUniquePointers newTreeNodes;
+    bool isTheLayerEven = true;
+    while (numberOfLayers != numberOfBytesNeededToWriteANumber) {
+        if (isTheLayerEven) treeLayerGenerator(treeNodes, newTreeNodes);
+        else treeLayerGenerator(newTreeNodes, treeNodes);
+
+        isTheLayerEven = !isTheLayerEven;
+        numberOfLayers++;
     }
 
-    arrayOfCharAndUnsignedInt wordOccurrence(wordMap.begin(), wordMap.end());
-    std::sort(wordOccurrence.begin(), wordOccurrence.end(), [](const auto &a, const auto &b) {
+    if (isTheLayerEven) return std::move(treeNodes[0]);
+    return std::move(newTreeNodes[0]);
+}
+
+static void codesGenerator(std::unordered_map<char, std::string> &codes, const std::unique_ptr<TreeNode> &treeRoot, const std::string &code = "") {
+    if (treeRoot->character != '\0') {
+        codes[treeRoot->character] = code;
+        return;
+    }
+
+    if (treeRoot->leftBranch != nullptr) codesGenerator(codes, treeRoot->leftBranch, code + '0');
+    if (treeRoot->rightBranch != nullptr) codesGenerator(codes, treeRoot->rightBranch, code + '1');
+}
+
+static void huffmanCompression(const std::string &string, std::string &compressedString) {
+    std::map<char, unsigned> characterMap;
+    for (char character: string) {
+        if (!characterMap.contains(character)) characterMap[character] = 1;
+        else characterMap[character] += 1;
+    }
+
+    arrayOfCharAndUnsigned characterOccurrence(characterMap.begin(), characterMap.end());
+    std::ranges::sort(characterOccurrence, [](const auto &a, const auto &b) {
         if (a.second != b.second) return a.second < b.second;
         return false;
     });
 
-    const unsigned int wordOccurrenceSize = wordOccurrence.size();
-    unsigned int wordDivider = wordOccurrenceSize / 2;
+    const std::unique_ptr<TreeNode> treeRoot = treeGenerator(characterOccurrence);
 
-    // for (int i = 0; i < wordOccurrenceSize; i++) std::println("{} -> {}", wordOccurrence[i].first, wordOccurrence[i].second);
-    // std::println("{}, {}", wordOccurrenceSize, wordDivider);
-    // std::println("{} -> {}", wordOccurrence[wordDivider].first, wordOccurrence[wordDivider].second);
+    std::unordered_map<char, std::string> codes;
+    codesGenerator(codes, treeRoot);
+
+    std::string fullStringCode;
+    for (char character: string) fullStringCode += codes[character];
+    const unsigned missingZeros = 8 - fullStringCode.size() % 8;
+    for (unsigned i = 0; i < missingZeros; i++) fullStringCode += '0';
+
+    const unsigned sizeOfTheFullCode = fullStringCode.size();
+    for (unsigned i = 0; i < sizeOfTheFullCode; i += 8) {
+        const char compressedCharacter = static_cast<char>(std::stoi(fullStringCode.substr(i, 8), nullptr, 2));
+        compressedString += compressedCharacter;
+    }
 }
 
 void problem8(const std::string &inputPath, const std::string &outputPath) {
-    const std::string word = "ALA_MA_KOTA";
+    std::ifstream input(inputPath);
 
-    huffmanCompression(word);
+    if (!input.is_open()) {
+        std::println("Nie udało się wczytać pliku: „{}”", inputPath);
+        return;
+    }
+
+    std::string string, compressedString;
+    getline(input, string);
+
+    input.close();
+
+    huffmanCompression(string, compressedString);
+
+    std::filesystem::create_directories("output");
+    std::ofstream output(outputPath);
+
+    std::println(output, "{}", compressedString);
+
+    output.close();
+}
 }

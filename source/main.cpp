@@ -3,7 +3,7 @@
 #include "huffman.hpp"
 
 int main() {
-    problem8("input/Out0305.txt", "output/In0305.txt");
+    huffman::problem8("input/In0305.txt", "output/Out0305.txt");
 
     std::println("Program przeszedł poprawnie przez wszystkie problemy! ^-^");
 
