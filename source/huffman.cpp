@@ -64,12 +64,14 @@ static void codesGenerator(std::unordered_map<char, std::string> &codes, const s
     if (treeRoot->rightBranch != nullptr) codesGenerator(codes, treeRoot->rightBranch, code + '1');
 }
 
-static void huffmanCompression(const std::string &string, std::string &codedMessage,
-        arrayOfCharAndInt &firstOccurrence, arrayOfCharAndInt &characterOccurrence, std::unordered_map<char, std::string> &codes) {
+static std::string huffmanCompression(const std::string &string, arrayOfCharAndInt &firstOccurrence, arrayOfCharAndInt &characterOccurrence,
+        std::unordered_map<char, std::string> &codes) {
     if (string.empty()) {
         std::println("Uwaga! Pusta wiadomość!");
-        return;
+        return "";
     }
+
+    std::string codedMessage;
 
     for (const char character: string) {
         bool found = false;
@@ -94,7 +96,7 @@ static void huffmanCompression(const std::string &string, std::string &codedMess
     if (characterOccurrence.size() == 1) {
         codes[characterOccurrence[0].first] = '0';
         codedMessage.assign((string.size() + 7) / 8, '\0');
-        return;
+        return codedMessage;
     }
 
     const std::unique_ptr<TreeNode> treeRoot = treeGenerator(characterOccurrence);
@@ -111,6 +113,8 @@ static void huffmanCompression(const std::string &string, std::string &codedMess
         const char compressedCharacter = static_cast<char>(std::stoi(fullStringCode.substr(i, 8), nullptr, 2));
         codedMessage += compressedCharacter;
     }
+
+    return codedMessage;
 }
 
 void problem8(const std::string &inputPath, const std::string &outputPath, const std::string &decompressionInputPath) {
@@ -121,7 +125,7 @@ void problem8(const std::string &inputPath, const std::string &outputPath, const
         return;
     }
 
-    std::string string, codedMessage;
+    std::string string;
     getline(input, string);
 
     input.close();
@@ -129,7 +133,7 @@ void problem8(const std::string &inputPath, const std::string &outputPath, const
     arrayOfCharAndInt firstOccurrence;
     arrayOfCharAndInt characterOccurrence;
     std::unordered_map<char, std::string> codes;
-    huffmanCompression(string, codedMessage, firstOccurrence, characterOccurrence, codes);
+    std::string codedMessage = huffmanCompression(string, firstOccurrence, characterOccurrence, codes);
 
     std::filesystem::create_directories("output");
     std::ofstream output(outputPath);

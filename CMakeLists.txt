@@ -8,5 +8,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #add_executable(${PROJECT_NAME} main.cpp)
 
 add_executable(${PROJECT_NAME} source/main.cpp
+    source/flower.cpp
     source/huffman.cpp
 )
