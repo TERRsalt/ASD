@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <bit>
+#include <bitset>
 #include <filesystem>
 #include <fstream>
 #include <print>
 #include <string>
 #include <memory>
+#include <ranges>
 #include <unordered_map>
 #include <vector>
 
@@ -14,57 +16,42 @@ namespace huffman {
 namespace {
 struct TreeNode {
     char character;
-    unsigned value;
+    int value;
     std::unique_ptr<TreeNode> leftBranch;
     std::unique_ptr<TreeNode> rightBranch;
 
-    explicit TreeNode(const char character = '\0', const unsigned value = 0,
-    std::unique_ptr<TreeNode> leftBranch = nullptr, std::unique_ptr<TreeNode> rightBranch = nullptr):
-    character(character), value(value), leftBranch(std::move(leftBranch)), rightBranch(std::move(rightBranch)) {}
+    explicit TreeNode(const char character = '\0', const int value = 0,
+            std::unique_ptr<TreeNode> leftBranch = nullptr, std::unique_ptr<TreeNode> rightBranch = nullptr):
+            character(character), value(value), leftBranch(std::move(leftBranch)), rightBranch(std::move(rightBranch)) {}
 };
 }
 
-using arrayOfCharAndUnsigned = std::vector<std::pair<char, unsigned>>;
+using arrayOfCharAndInt = std::vector<std::pair<char, int>>;
 using arrayOfTheTreeNodesUniquePointers = std::vector<std::unique_ptr<TreeNode>>;
 
-static void treeLayerGenerator(arrayOfTheTreeNodesUniquePointers &treeNodes, arrayOfTheTreeNodesUniquePointers &newTreeNodes) {
-    const unsigned treeSize = treeNodes.size();
-    const unsigned evenTreeSizeDividedByTwo = treeSize / 2;
+static void treeLayerGenerator(arrayOfTheTreeNodesUniquePointers &treeNodes) {
+    const size_t evenTreeSizeDividedByTwo = treeNodes.size() / 2;
 
-    newTreeNodes.reserve(evenTreeSizeDividedByTwo + 1);
+    for (int i = 0; i < evenTreeSizeDividedByTwo; i++) {
+        treeNodes.push_back(std::make_unique<TreeNode>('\0', treeNodes[0]->value + treeNodes[1]->value,
+                std::move(treeNodes[0]), std::move(treeNodes[1])));
 
-    for (unsigned i = 0; i < evenTreeSizeDividedByTwo; i++)
-        newTreeNodes.push_back(std::make_unique<TreeNode>('\0', treeNodes[i * 2]->value + treeNodes[i * 2 + 1]->value,
-                std::move(treeNodes[i * 2]), std::move(treeNodes[i * 2 + 1])));
+        treeNodes.erase(treeNodes.begin(), treeNodes.begin() + 2);
 
-    if (treeSize % 2 != 0) newTreeNodes.push_back(std::move(treeNodes[treeSize - 1]));
-
-    treeNodes.clear();
+        std::ranges::stable_sort(treeNodes, [](const auto &a, const auto &b) {return a->value < b->value;});
+    }
 }
 
-static std::unique_ptr<TreeNode> treeGenerator(const arrayOfCharAndUnsigned &characterOccurrence) {
-    const unsigned treeSize = characterOccurrence.size();
+static std::unique_ptr<TreeNode> treeGenerator(const arrayOfCharAndInt &characterOccurrence) {
+    const size_t treeSize = characterOccurrence.size();
 
     arrayOfTheTreeNodesUniquePointers treeNodes;
-    treeNodes.reserve(treeSize);
-    for (unsigned i = 0; i < treeSize; i++)
+    for (int i = 0; i < treeSize; i++)
         treeNodes.push_back(std::make_unique<TreeNode>(characterOccurrence[i].first, characterOccurrence[i].second));
 
-    const unsigned numberOfBytesNeededToWriteANumber = std::bit_width(treeSize - 1);
-    unsigned numberOfLayers = 0;
+    for (int i = 0; i < std::bit_width(treeSize - 1); i++) treeLayerGenerator(treeNodes);
 
-    arrayOfTheTreeNodesUniquePointers newTreeNodes;
-    bool isTheLayerEven = true;
-    while (numberOfLayers != numberOfBytesNeededToWriteANumber) {
-        if (isTheLayerEven) treeLayerGenerator(treeNodes, newTreeNodes);
-        else treeLayerGenerator(newTreeNodes, treeNodes);
-
-        isTheLayerEven = !isTheLayerEven;
-        numberOfLayers++;
-    }
-
-    if (isTheLayerEven) return std::move(treeNodes[0]);
-    return std::move(newTreeNodes[0]);
+    return std::move(treeNodes[0]);
 }
 
 static void codesGenerator(std::unordered_map<char, std::string> &codes, const std::unique_ptr<TreeNode> &treeRoot, const std::string &code = "") {
@@ -77,8 +64,13 @@ static void codesGenerator(std::unordered_map<char, std::string> &codes, const s
     if (treeRoot->rightBranch != nullptr) codesGenerator(codes, treeRoot->rightBranch, code + '1');
 }
 
-static void huffmanCompression(const std::string &string, std::string &compressedString,
-        arrayOfCharAndUnsigned &firstOccurrence, arrayOfCharAndUnsigned &characterOccurrence, std::unordered_map<char, std::string> &codes) {
+static void huffmanCompression(const std::string &string, std::string &codedMessage,
+        arrayOfCharAndInt &firstOccurrence, arrayOfCharAndInt &characterOccurrence, std::unordered_map<char, std::string> &codes) {
+    if (string.empty()) {
+        std::println("Uwaga! Pusta wiadomość!");
+        return;
+    }
+
     for (const char character: string) {
         bool found = false;
 
@@ -94,10 +86,16 @@ static void huffmanCompression(const std::string &string, std::string &compresse
     }
 
     characterOccurrence.assign(firstOccurrence.begin(), firstOccurrence.end());
-    std::ranges::sort(characterOccurrence, [](const auto &a, const auto &b) {
+    std::ranges::stable_sort(characterOccurrence, [](const auto &a, const auto &b) {
         if (a.second != b.second) return a.second < b.second;
         return a.first < b.first;
     });
+
+    if (characterOccurrence.size() == 1) {
+        codes[characterOccurrence[0].first] = '0';
+        codedMessage.assign((string.size() + 7) / 8, '\0');
+        return;
+    }
 
     const std::unique_ptr<TreeNode> treeRoot = treeGenerator(characterOccurrence);
 
@@ -105,17 +103,17 @@ static void huffmanCompression(const std::string &string, std::string &compresse
 
     std::string fullStringCode;
     for (const char character: string) fullStringCode += codes[character];
-    const unsigned missingZeros = (8 - fullStringCode.size() % 8) % 8;
-    for (unsigned i = 0; i < missingZeros; i++) fullStringCode += '0';
+    const size_t missingZeros = (8 - fullStringCode.size() % 8) % 8;
+    for (int i = 0; i < missingZeros; i++) fullStringCode += '0';
 
-    const unsigned sizeOfTheFullCode = fullStringCode.size();
-    for (unsigned i = 0; i < sizeOfTheFullCode; i += 8) {
+    const size_t sizeOfTheFullCode = fullStringCode.size();
+    for (int i = 0; i < sizeOfTheFullCode; i += 8) {
         const char compressedCharacter = static_cast<char>(std::stoi(fullStringCode.substr(i, 8), nullptr, 2));
-        compressedString += compressedCharacter;
+        codedMessage += compressedCharacter;
     }
 }
 
-void problem8(const std::string &inputPath, const std::string &outputPath) {
+void problem8(const std::string &inputPath, const std::string &outputPath, const std::string &decompressionInputPath) {
     std::ifstream input(inputPath);
 
     if (!input.is_open()) {
@@ -123,20 +121,20 @@ void problem8(const std::string &inputPath, const std::string &outputPath) {
         return;
     }
 
-    std::string string, compressedString;
+    std::string string, codedMessage;
     getline(input, string);
 
     input.close();
 
-    arrayOfCharAndUnsigned firstOccurrence;
-    arrayOfCharAndUnsigned characterOccurrence;
+    arrayOfCharAndInt firstOccurrence;
+    arrayOfCharAndInt characterOccurrence;
     std::unordered_map<char, std::string> codes;
-    huffmanCompression(string, compressedString, firstOccurrence, characterOccurrence, codes);
+    huffmanCompression(string, codedMessage, firstOccurrence, characterOccurrence, codes);
 
     std::filesystem::create_directories("output");
     std::ofstream output(outputPath);
 
-    unsigned i = 0;
+    int i = 0;
     for (const auto &[character, value]: firstOccurrence) {
         i++;
         if (i < firstOccurrence.size()) std::print(output, "{} {}, ", character, value);
@@ -159,19 +157,112 @@ void problem8(const std::string &inputPath, const std::string &outputPath) {
 
     std::println(output, "////////////////////////////////////////////");
 
+    std::ofstream decompressionInput(decompressionInputPath);
+
     i = 0;
     for (const auto &[character, value]: firstOccurrence) {
         i++;
-        if (i < firstOccurrence.size()) std::print(output, "{}-{} ", character, value);
-        else std::println(output, "{}-{}", character, value);
+        if (i < firstOccurrence.size()) {
+            std::print(output, "{}-{} ", character, value);
+            std::print(decompressionInput, "{}-{} ", character, value);
+        }
+        else {
+            std::println(output, "{}-{}", character, value);
+            std::println(decompressionInput, "{}-{}", character, value);
+        }
     }
 
-    std::print(output, "{}", compressedString);
+    std::print(output, "{}", codedMessage);
+    std::print(decompressionInput, "{}", codedMessage);
 
+    decompressionInput.close();
     output.close();
 }
 
-void huffmanDecompression() {
-    //todo // Dodaj dekompresję //
+static void huffmanDecompression(arrayOfCharAndInt &characterOccurrence, const std::string &codedMessage, std::string &decodedMessage) {
+    if (characterOccurrence.empty()) {
+        std::println("Uwaga! Pusta wiadomość!");
+        return;
+    }
+
+    std::ranges::sort(characterOccurrence, [](const auto &a, const auto &b) {
+        if (a.second != b.second) return a.second < b.second;
+        return a.first < b.first;
+    });
+
+    size_t sizeOfDecodedMessage = 0;
+    for (const int value: characterOccurrence | std::views::values) sizeOfDecodedMessage += value;
+
+
+    if (characterOccurrence.size() == 1) {
+        decodedMessage.assign(characterOccurrence[0].second, characterOccurrence[0].first);
+        return;
+    }
+
+    const std::unique_ptr<TreeNode> treeRoot = treeGenerator(characterOccurrence);
+
+    std::unordered_map<char, std::string> codes;
+    std::unordered_map<char, int> codesDecimal;
+    codesGenerator(codes, treeRoot);
+
+    std::string binaryCode;
+    for (const char character: codedMessage) {
+        const int decimalCharacter = static_cast<unsigned char>(character);
+        binaryCode += std::bitset<8>(decimalCharacter).to_string();
+    }
+
+    const TreeNode *pointer = treeRoot.get();
+    int i = 0;
+    for (const char byte: binaryCode) {
+        if (byte == '0') pointer = pointer->leftBranch.get();
+        else pointer = pointer->rightBranch.get();
+
+        if (pointer->character != '\0') {
+            decodedMessage += pointer->character;
+            pointer = treeRoot.get();
+
+            i++;
+            if (i == sizeOfDecodedMessage) break;
+        }
+    }
+}
+
+void problem8b(const std::string &inputPath, const std::string &outputPath) {
+    std::ifstream input(inputPath);
+
+    if (!input.is_open()) {
+        std::println("Nie udało się wczytać pliku: „{}”", inputPath);
+        return;
+    }
+
+    std::string characterOccurrenceString, codedMessage;
+    getline(input, characterOccurrenceString);
+    getline(input, codedMessage);
+
+    input.close();
+
+    arrayOfCharAndInt firstOccurrence;
+    size_t i = 0;
+    while (i + 2 < characterOccurrenceString.size()) {
+        const char character = characterOccurrenceString[i];
+
+        const size_t end = characterOccurrenceString.find(' ', i + 2);
+        const std::string number = characterOccurrenceString.substr(i + 2, end - (i + 2));
+
+        firstOccurrence.emplace_back(character, static_cast<int>(std::stoul(number)));
+
+        if (end == std::string::npos) break;
+        i = end + 1;
+    }
+
+    std::string decodedMessage;
+    huffmanDecompression(firstOccurrence, codedMessage, decodedMessage);
+
+    std::filesystem::create_directories("output");
+    std::ofstream output(outputPath);
+
+    std::print(output, "{}", decodedMessage);
+
+    output.close();
 }
 }
